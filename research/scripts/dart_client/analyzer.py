@@ -86,3 +86,63 @@ def analyze_company(
         "적자여부": metrics["_적자여부"],
         "EBITDA방식": metrics["_EBITDA_방식"],
     }
+
+from .search import get_company_by_stock_code, search_company
+
+
+def analyze_by_stock_code(
+    stock_code: str,
+    year: int = 2025,
+    reprt_code: str = "11011",
+    verbose: bool = True,
+) -> dict:
+    """
+    종목코드 하나만으로 전체 분석 (가장 편한 사용법).
+    
+    Args:
+        stock_code: KRX 종목코드 (예: "005930")
+    
+    Returns:
+        dict: 분석 결과 또는 {"error": "..."}
+    """
+    company = get_company_by_stock_code(stock_code)
+    if not company:
+        return {"error": f"종목코드를 찾을 수 없음: {stock_code}"}
+    
+    return analyze_company(
+        name=company["name"],
+        corp_code=company["corp_code"],
+        stock_code=company["stock_code"],
+        year=year,
+        reprt_code=reprt_code,
+        verbose=verbose,
+    )
+
+
+def analyze_by_search(
+    query: str,
+    year: int = 2025,
+    reprt_code: str = "11011",
+) -> dict:
+    """
+    검색어로 첫 번째 매칭 회사 분석.
+    여러 결과 있으면 첫 번째만.
+    
+    Args:
+        query: 검색어 (예: "삼성전자", "005930", "삼성")
+    
+    Returns:
+        dict: 분석 결과 또는 {"error": "..."}
+    """
+    matches = search_company(query, limit=1)
+    if not matches:
+        return {"error": f"검색 결과 없음: {query}"}
+    
+    company = matches[0]
+    return analyze_company(
+        name=company["name"],
+        corp_code=company["corp_code"],
+        stock_code=company["stock_code"],
+        year=year,
+        reprt_code=reprt_code,
+    )
