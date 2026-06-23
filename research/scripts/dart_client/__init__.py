@@ -16,7 +16,10 @@ from .analyzer import (
     analyze_by_search,
 )
 from .financials import get_financial_data
-from .shares import get_shares_outstanding
+from .shares import (
+    get_shares_outstanding,
+    get_shares_outstanding_with_fallback,
+)
 from .price import get_current_price
 from .metrics import calculate_metrics
 from .search import (
@@ -36,6 +39,7 @@ __all__ = [
     # 개별 함수
     "get_financial_data",
     "get_shares_outstanding",
+    "get_shares_outstanding_with_fallback",
     "get_current_price",
     "calculate_metrics",
     "get_quarterly_trend",

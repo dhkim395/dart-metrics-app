@@ -83,3 +83,49 @@ def get_shares_outstanding(corp_code: str, year: int, reprt_code: str) -> dict:
             result["우선주_유통"] = _safe_int(row.get("distb_stock_co"))
     
     return result
+
+def get_shares_outstanding_with_fallback(
+    corp_code: str,
+    year: int,
+    reprt_code: str,
+) -> dict:
+    """
+    발행주식수 조회 with fallback.
+    
+    1. 요청한 보고서에서 시도
+    2. 없으면 같은 해 반기보고서 시도
+    3. 없으면 같은 해 사업보고서 시도
+    4. 없으면 전년도 사업보고서 시도
+    """
+    # 1차: 요청한 보고서
+    result = get_shares_outstanding(corp_code, year, reprt_code)
+    if "error" not in result and result.get("보통주_유통"):
+        return result
+    
+    # 2차: 같은 해 반기보고서 (1Q일 때만 의미 있음)
+    if reprt_code == "11013":
+        result = get_shares_outstanding(corp_code, year, "11012")
+        if "error" not in result and result.get("보통주_유통"):
+            result["_fallback"] = f"{year}년 반기보고서"
+            return result
+    
+    # 3차: 같은 해 사업보고서
+    if reprt_code != "11011":
+        result = get_shares_outstanding(corp_code, year, "11011")
+        if "error" not in result and result.get("보통주_유통"):
+            result["_fallback"] = f"{year}년 사업보고서"
+            return result
+    
+    # 4차: 전년도 사업보고서
+    result = get_shares_outstanding(corp_code, year - 1, "11011")
+    if "error" not in result and result.get("보통주_유통"):
+        result["_fallback"] = f"{year - 1}년 사업보고서"
+        return result
+    
+    # 5차: 2년 전 사업보고서
+    result = get_shares_outstanding(corp_code, year - 2, "11011")
+    if "error" not in result and result.get("보통주_유통"):
+        result["_fallback"] = f"{year - 2}년 사업보고서"
+        return result
+    
+    return {"error": "발행주식수를 어느 보고서에서도 찾을 수 없음"}

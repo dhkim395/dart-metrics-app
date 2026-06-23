@@ -4,7 +4,7 @@
 나중에 백엔드 API에서 이 함수를 그대로 호출.
 """
 from .financials import get_financial_data
-from .shares import get_shares_outstanding
+from .shares import get_shares_outstanding_with_fallback
 from .price import get_current_price
 from .metrics import calculate_metrics
 
@@ -43,7 +43,7 @@ def analyze_company(
         return {"회사명": name, "error": fin["error"]}
     
     # 2. 발행주식수
-    shares = get_shares_outstanding(corp_code, year, reprt_code)
+    shares = get_shares_outstanding_with_fallback(corp_code, year, reprt_code)
     if "error" in shares or not shares.get("보통주_유통"):
         if verbose:
             print(f"❌ 발행주식수")
