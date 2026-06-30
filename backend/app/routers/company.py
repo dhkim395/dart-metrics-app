@@ -19,7 +19,10 @@ if DART_CLIENT_PATH not in sys.path:
 from dart_client import (
     analyze_by_stock_code,
     get_quarterly_trend,
+    analyze_latest_by_stock_code,
     get_company_by_stock_code,
+    find_latest_report,
+    REPORT_LABELS,
 )
 
 from app.models import TrendResponse, QuarterData
@@ -69,6 +72,87 @@ async def get_metrics(
     result["_cache"] = "MISS"  # 첫 호출 표시
     return result
 
+@router.get("/{stock_code}/metrics/latest")
+async def get_metrics_latest(stock_code: str):
+    """
+    가장 최신 가용 보고서로 자동 분석.
+    
+    시스템이 자동으로 가장 최근 사용 가능한 보고서를 찾아서 사용.
+    예: 2026년 1Q가 있으면 그것, 없으면 2025 사업보고서, ...
+    """
+    # 캐시 키 (자동 최신용)
+    cache_key = f"metrics_latest:{stock_code}"
+    cached = cache.get(cache_key)
+    if cached:
+        cached["_cache"] = "HIT"
+        return cached
+    
+    result = analyze_latest_by_stock_code(stock_code, verbose=False)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    
+    # 캐시 저장 (15분 TTL — 최신 데이터라 짧게)
+    cache.set(cache_key, result, ttl_seconds=15 * 60)
+    result["_cache"] = "MISS"
+    return result
+
+
+@router.get("/{stock_code}/reports/available")
+async def get_available_reports(stock_code: str):
+    """
+    해당 종목의 사용 가능한 보고서 목록.
+    드롭다운 UI용.
+    """
+    company = get_company_by_stock_code(stock_code)
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail=f"종목코드를 찾을 수 없음: {stock_code}",
+        )
+    
+    from datetime import datetime
+    current_year = datetime.now().year
+    
+    available = []
+    report_priority = ["11011", "11014", "11012", "11013"]
+    
+    # 최근 3년치 확인
+    for year_offset in range(0, 3):
+        year = current_year - year_offset
+        for reprt_code in report_priority:
+            cache_key = f"reports_avail:{stock_code}:{year}:{reprt_code}"
+            cached = cache.get(cache_key)
+            
+            if cached is not None:
+                if cached:  # True
+                    available.append({
+                        "year": year,
+                        "reprt_code": reprt_code,
+                        "label": f"{year}년 {REPORT_LABELS[reprt_code]}",
+                    })
+                continue
+            
+            # 빠른 체크
+            from dart_client import get_financial_data
+            fin = get_financial_data(company["corp_code"], year, reprt_code)
+            is_available = "error" not in fin and fin.get("매출액") is not None
+            
+            cache.set(cache_key, is_available, ttl_seconds=60 * 60)  # 1시간
+            
+            if is_available:
+                available.append({
+                    "year": year,
+                    "reprt_code": reprt_code,
+                    "label": f"{year}년 {REPORT_LABELS[reprt_code]}",
+                })
+    
+    return {
+        "stock_code": stock_code,
+        "company_name": company["name"],
+        "count": len(available),
+        "reports": available,
+    }
 
 @router.get("/{stock_code}/trend", response_model=TrendResponse)
 async def get_trend(

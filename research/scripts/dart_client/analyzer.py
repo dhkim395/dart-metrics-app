@@ -89,6 +89,99 @@ def analyze_company(
 
 from .search import get_company_by_stock_code, search_company
 
+# 보고서 코드 → 사람이 읽는 라벨
+REPORT_LABELS = {
+    "11011": "사업보고서",
+    "11014": "3분기보고서",
+    "11012": "반기보고서",
+    "11013": "1분기보고서",
+}
+
+
+def find_latest_report(corp_code: str) -> tuple:
+    """
+    가장 최신 가용 보고서를 자동으로 찾는다.
+    
+    시도 순서 (최신 → 과거):
+    - 올해 사업보고서 → 3Q → 반기 → 1Q
+    - 작년 사업보고서 → 3Q → 반기 → 1Q
+    - ... 최대 3년 전까지
+    
+    Returns:
+        (year, reprt_code, label) 또는 None
+    """
+    from datetime import datetime
+    current_year = datetime.now().year
+    
+    # 보고서 우선순위 (최신부터)
+    report_priority = ["11011", "11014", "11012", "11013"]
+    
+    for year_offset in range(0, 4):  # 올해, 작년, 재작년, 3년 전
+        year = current_year - year_offset
+        
+        for reprt_code in report_priority:
+            # 빠른 체크: 재무 데이터만 시도
+            from .financials import get_financial_data
+            fin = get_financial_data(corp_code, year, reprt_code)
+            
+            if "error" not in fin and fin.get("매출액") is not None:
+                label = f"{year}년 {REPORT_LABELS[reprt_code]}"
+                return (year, reprt_code, label)
+    
+    return None
+
+
+def analyze_latest(
+    name: str,
+    corp_code: str,
+    stock_code: str,
+    verbose: bool = True,
+) -> dict:
+    """
+    가장 최신 가용 보고서로 자동 분석.
+    """
+    latest = find_latest_report(corp_code)
+    if not latest:
+        return {"회사명": name, "error": "최근 4년 내 가용 보고서 없음"}
+    
+    year, reprt_code, label = latest
+    
+    if verbose:
+        print(f"📅 자동 선택: {label}")
+    
+    result = analyze_company(
+        name=name,
+        corp_code=corp_code,
+        stock_code=stock_code,
+        year=year,
+        reprt_code=reprt_code,
+        verbose=verbose,
+    )
+    
+    if "error" not in result:
+        result["_보고서_라벨"] = label
+        result["_보고서_코드"] = reprt_code
+    
+    return result
+
+
+def analyze_latest_by_stock_code(
+    stock_code: str,
+    verbose: bool = True,
+) -> dict:
+    """종목코드로 자동 최신 분석."""
+    from .search import get_company_by_stock_code
+    
+    company = get_company_by_stock_code(stock_code)
+    if not company:
+        return {"error": f"종목코드를 찾을 수 없음: {stock_code}"}
+    
+    return analyze_latest(
+        name=company["name"],
+        corp_code=company["corp_code"],
+        stock_code=company["stock_code"],
+        verbose=verbose,
+    )
 
 def analyze_by_stock_code(
     stock_code: str,

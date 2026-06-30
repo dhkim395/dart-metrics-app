@@ -13,7 +13,10 @@ DART API 클라이언트 패키지.
 from .analyzer import (
     analyze_company,
     analyze_by_stock_code,
-    analyze_by_search,
+    analyze_by_search,analyze_latest,
+    analyze_latest_by_stock_code,
+    find_latest_report,
+    REPORT_LABELS,      
 )
 from .financials import get_financial_data
 from .shares import (
@@ -36,6 +39,10 @@ __all__ = [
     "get_company_by_corp_code",
     # 분석
     "analyze_company",
+    "analyze_latest",
+    "analyze_latest_by_stock_code",
+    "find_latest_report",
+    "REPORT_LABELS",
     # 개별 함수
     "get_financial_data",
     "get_shares_outstanding",
