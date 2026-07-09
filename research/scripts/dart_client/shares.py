@@ -55,7 +55,7 @@ def get_shares_outstanding(corp_code: str, year: int, reprt_code: str) -> dict:
         return {"error": f"DART {data.get('status')}: {data.get('message')}"}
     
     df = pd.DataFrame(data["list"])
-    
+
     result = {
         "corp_code": corp_code,
         "year": year,
@@ -71,14 +71,17 @@ def get_shares_outstanding(corp_code: str, year: int, reprt_code: str) -> dict:
         se = str(row.get("se", "")).strip()
         
         # 보통주 (또는 의결권 있는 주식)
-        if se in ("보통주", "의결권 있는 주식"):
+        if se in ("합계", "비고"):
+            continue
+
+        if "보통주" in se:
             result["보통주_발행"] = _safe_int(row.get("istc_totqy"))
             result["보통주_자기주식"] = _safe_int(row.get("tesstk_co"))
             result["보통주_유통"] = _safe_int(row.get("distb_stock_co"))
             result["증권표기방식"] = se
         
         # 우선주 (또는 의결권 없는 주식)
-        elif se in ("우선주", "의결권 없는 주식"):
+        elif "우선주" in se:
             result["우선주_발행"] = _safe_int(row.get("istc_totqy"))
             result["우선주_유통"] = _safe_int(row.get("distb_stock_co"))
     
